@@ -9,13 +9,15 @@ var level = require('level');
 var lambda = new AWS.Lambda();
 
 class Earl {
-    constructor(ifname, ofname, dbname) {
-        this.lambda_names = [];
+    constructor(lambda_names, ifname, ofname, dbname) {
+        this.lambda_names = lambda_names;
         this.ips = {};
         this.readstream = new lineByLine(ifname);
         this.db = level(dbname);
         this.allLinesRead = false;
         this.urlsToWrite = [];
+        this.ofname = ofname;
+        this.numProcessed = 0;
 
         this.collectIPs(() => {
             setTimeout(() => {
@@ -32,8 +34,8 @@ class Earl {
     async expand() {
         let ipFreeze = JSON.parse(JSON.stringify(this.ips));
 
-        for(ip in ipFreeze) {
-            let url = await this.getNextURL();
+        for(let ip in ipFreeze) {
+            let [url, year] = await this.getNextURL();
             let name = ipFreeze[ip][0];
             let region = ipFreeze[ip][1];
 
@@ -47,20 +49,41 @@ class Earl {
             lambda.invoke(params, (err, data) => {
                 let message = {};
                 if(err) {
+                    //console.log("There was an error");
                     message["orig_url"] = url;
                     message["err"] = true;
                     message["msg"] = err.toString();
-                    message["url"] = null;
-                    message["time"] = null;
+                    message["url"] = "";
+                    message["time"] = "";
                 }
                 else {
+                    //console.log("we successed");
+                    console.log(data);
+                    
                     let res = JSON.parse(data["Payload"]);
-                    message.err = res.error;
-                    message.orig_url = res.orig_url;
-                    message.url = url;
-                    message.time = res.diff;
-                    message.msg = res.message;
+
+                    if(res.errorMessage) {
+                        message["orig_url"] = url;
+                        message["err"] = true;
+                        message["msg"] = res.errorMessage;
+                        message["time"] = "";
+                        message["url"] = "";
+                    }
+                    else {
+                        message["err"] = res.error;
+                        message["orig_url"] = res.orig_url;
+
+                        if(!res.orig_url) {
+                            console.log("\n\n\nTHIS ONE IS DEAD\n\n\n");
+                        }
+
+                        message["url"] = res.url;
+                        message["time"] = res.diff;
+                        message["msg"] = res.message;
+                    }
                 }
+                this.numProcessed++;
+                console.log(message["orig_url"] + " --< " + message["url"] + ": " + this.numProcessed);
                 this.urlsToWrite.push(message);
                 if(this.urlsToWrite.length >= 50) {
                     this.writeURLs();
@@ -70,7 +93,7 @@ class Earl {
     }
 
     writeURLs() {
-        //console.log("Writing a batch of URLs");
+        console.log("Writing a batch of URLs");
         let urlsCopy = JSON.parse(JSON.stringify(this.urlsToWrite)); // live with it
         this.urlsToWrite = [];
         let urlStr = "";
@@ -82,10 +105,12 @@ class Earl {
                       urlsCopy[i].msg;
             urlStr += "\r\n";
 
-            this.db.put(urlsCopy[i].origURL, "", () => {});
+            console.log(urlsCopy[i]);
+            console.log("ORIG URL: " + urlsCopy[i].orig_url);
+            this.db.put(urlsCopy[i].orig_url, "", () => {});
         }
 
-        var stream = fs.createWriteStream(this.results_name, {flags:'a'});
+        var stream = fs.createWriteStream(this.ofname, {flags:'a'});
         stream.write(urlStr);
         stream.end();
     }
@@ -151,7 +176,7 @@ class Earl {
                     ips[ip] = [name, region];
                 }
     
-                if(numProcessed === count) {
+                if(numProcessed === this.lambda_names.length) {
                     console.log("All IPs have been processed");
                     this.ips = ips;
                     cb();
@@ -227,3 +252,26 @@ function update(count, numUpdated, region) {
 //update(900, 0, "us-east-1");
 //launch(900, 501, "us-east-1");
 //collectIPs("us-east-1", 900, 0);
+function getLambdaNames() {
+    let ln = [];
+    for(let i = 0; i < 70; i++) {
+        ln.push(["hydrate-" + i, "us-east-1"]);
+    }
+    return ln;
+}
+
+let earl = new Earl(getLambdaNames(), "/media/luke/277eaea3-2185-4341-a594-d0fe5146d917/twitter_urls/2019.tsv", "res.tsv", "resdb");
+
+
+
+// AWS.config.update({region: "us-east-1"});
+
+// var params = {
+//     FunctionName: "hydrate-1",
+//     Payload: JSON.stringify({"url": "https://dy.si/VTXLju"})
+// };
+
+// lambda.invoke(params, (err, data) => {
+//     console.log(err);
+//     console.log(data);
+//});
