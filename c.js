@@ -143,7 +143,7 @@ class Earl {
                     return [url, year];
                 }
                 else {
-                    console.log("We already processed " + url);
+                    //console.log("We already processed " + url);
                 }
             }
             else {
