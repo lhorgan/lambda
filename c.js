@@ -22,8 +22,12 @@ class Earl {
 
         this.collectIPs();
 
-        setInterval(async () => {
-            await this.expand();
+        let interval = setInterval(async () => {
+            let done = await this.expand();
+            if(done) {
+                clearInterval(interval);
+                console.log("That's all, folks.");
+            }
         }, 1000);
     }
 
@@ -37,6 +41,11 @@ class Earl {
 
         for(let ip in ipFreeze) {
             let [url, year] = await this.getNextURL();
+
+            if(url === null && year === null) {
+                return false;
+            }
+
             let name = ipFreeze[ip][0];
             let region = ipFreeze[ip][1];
             ctr++;
@@ -53,6 +62,8 @@ class Earl {
                 }
             }
         }
+
+        return true;
     }
 
     handleErrors(response) {
