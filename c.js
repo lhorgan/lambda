@@ -78,6 +78,7 @@ class Earl {
             console.log(this.numProcessed);
         })
         .catch(err => {
+            console.log(err);
             console.log("Something seems to have gone wrong...");
             urls = JSON.parse(urls);
             for(let i = 0; i < urls.length; i++) {
@@ -163,6 +164,7 @@ class Earl {
             lambda.invoke(params, (err, data) => {
                 numProcessed++;
                 if(err) {
+                    console.log(err);
                     console.log("Something went wrong");
                 } // an error occurred
                 else {
@@ -190,10 +192,30 @@ class Earl {
 
 function getLambdaNames() {
     let ln = [];
-    for(let i = 0; i < 80; i++) {
+    for(let i = 0; i < 900; i++) {
         ln.push(["hydrate-" + i, "us-east-1"]);
     }
     return ln;
 }
 
-let earl = new Earl(getLambdaNames(), "/media/luke/277eaea3-2185-4341-a594-d0fe5146d917/twitter_urls/2019.tsv", "res.tsv", "resdb", ["http://127.0.0.1:8081"], 50);
+
+
+function go() {
+    fs.readFile("client_config.json", function(err, config) {
+        if(err) {
+            throw err;
+        }
+        else {
+            let config = JSON.parse(config);
+
+            let earl = new Earl(getLambdaNames(), 
+                                config.src, 
+                                config.dst, 
+                                config.db, 
+                                config.servers, 
+                                50);
+        }
+    });
+}
+
+go();
