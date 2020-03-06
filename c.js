@@ -217,7 +217,7 @@ function go() {
             throw err;
         }
         else {
-            let config = JSON.parse(config);
+            config = JSON.parse(config);
 
             let earl = new Earl(getLambdaNames(), 
                                 config.src, 
