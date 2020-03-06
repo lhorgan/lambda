@@ -23,7 +23,7 @@ class Earl {
         this.collectIPs();
 
         let interval = setInterval(async () => {
-            let done = await this.expand();
+            let done = !await this.expand();
             if(done) {
                 clearInterval(interval);
                 console.log("That's all, folks.");
