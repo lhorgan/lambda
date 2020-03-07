@@ -180,10 +180,14 @@ class Earl {
                 } // an error occurred
                 else {
                     console.log(data);
-                    let ip = (JSON.parse(data["Payload"])["ip"]).trim();
-                    //console.log(ip + ": " + numProcessed);
-                    //ips.push(ip);
-                    ips[ip] = [name, region];
+                    let data = JSON.parse(data);
+                    if("Payload" in data && "ip" in data["Payload"]) {
+                        let ip = (JSON.parse(data["Payload"])["ip"]).trim();
+                        ips[ip] = [name, region];
+                    }
+                    else {
+                        console.log("Error fetching ip");
+                    }
                 }
     
                 if(numProcessed === this.lambda_names.length) {
