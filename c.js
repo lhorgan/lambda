@@ -19,6 +19,7 @@ class Earl {
         this.servers = servers;
         this.lambdasPerServer = lambdasPerServer;
         this.queue = [];
+        this.urlCount = 0;
 
         this.collectIPs();
 
@@ -129,6 +130,11 @@ class Earl {
 
             if(line) {
                 this.urlCount++;
+                
+                if(this.urlCount % 1000 === 0) {
+                    console.log("URL Count: " + this.urlCount);
+                }
+
                 line =  line.toString("utf-8");
                 let [url, year] = line.trim().split("\t");
 
