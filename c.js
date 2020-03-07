@@ -180,13 +180,18 @@ class Earl {
                 } // an error occurred
                 else {
                     console.log(data);
-                    data = JSON.parse(data);
-                    if("Payload" in data && "ip" in data["Payload"]) {
-                        let ip = (JSON.parse(data["Payload"])["ip"]).trim();
-                        ips[ip] = [name, region];
+                    if("Payload" in data) {
+                        let payload = JSON.parse(data["Payload"]);
+                        if("ip" in payload) {
+                            let ip = payload["ip"].trim();
+                            ips[ip] = [name, region];
+                        }
+                        else {
+                            console.log("Payload present, but  missing IP");
+                        }
                     }
                     else {
-                        console.log("Error fetching ip");
+                        console.log("No payload for ip");
                     }
                 }
     
