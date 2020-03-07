@@ -180,7 +180,7 @@ class Earl {
                 } // an error occurred
                 else {
                     console.log(data);
-                    let data = JSON.parse(data);
+                    data = JSON.parse(data);
                     if("Payload" in data && "ip" in data["Payload"]) {
                         let ip = (JSON.parse(data["Payload"])["ip"]).trim();
                         ips[ip] = [name, region];
