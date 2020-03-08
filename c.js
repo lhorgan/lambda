@@ -26,7 +26,7 @@ class Earl {
 
         let interval = setInterval(async () => {
             this.done = !await this.expand();
-            if(done) {
+            if(this.done) {
                 clearInterval(interval);
                 console.log("That's all, folks.");
             }
