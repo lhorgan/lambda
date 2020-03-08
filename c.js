@@ -20,11 +20,12 @@ class Earl {
         this.lambdasPerServer = lambdasPerServer;
         this.queue = [];
         this.urlCount = 0;
+        this.done = false;
 
         this.collectIPs();
 
         let interval = setInterval(async () => {
-            let done = !await this.expand();
+            this.done = !await this.expand();
             if(done) {
                 clearInterval(interval);
                 console.log("That's all, folks.");
@@ -44,6 +45,10 @@ class Earl {
             let [url, year] = await this.getNextURL();
 
             if(url === null && year === null) {
+                let urlsToSendFreeze = JSON.stringify(urlsToSend);
+                this.sendURLs(this.servers[serverIndex], urlsToSendFreeze);
+                urlsToSend = [];
+
                 return false;
             }
 
@@ -206,8 +211,10 @@ class Earl {
                     this.ips = ips;
                     
                     setTimeout(() => {
-                        console.log("Collecting ips");
-                        this.collectIPs();
+                        if(!this.done) {
+                            console.log("Collecting ips");
+                            this.collectIPs();
+                        }
                     }, 3*60*1000);
                 }
             });
