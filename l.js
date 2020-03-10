@@ -4,12 +4,11 @@ var AWS = require('aws-sdk');
 AWS.config.update({region: 'us-east-1'});
 var fs = require('fs');
 
-var lambda = new AWS.Lambda();
-
 /* Create/update the lambdas. */
 function launch(count, numLaunched, region, update) {
     if(numLaunched < count) {
         AWS.config.update({region: region});
+        let lambda = new AWS.Lambda();
 
         var params = {
             Code: {
@@ -27,12 +26,12 @@ function launch(count, numLaunched, region, update) {
             }
         };
         
-        let f = lambda.createFunction;
+        /*let f = lambda.createFunction;
         if(update) {
             f = lambda.updateFunctionConfiguration;
-        }
+        }*/
 
-        f(params, (err, data) => {
+        lambda.createFunction(params, (err, data) => {
             if(err) {
                 console.log(err);
                 setTimeout(() => { launch(count, numLaunched, region); }, 1000);
@@ -69,5 +68,4 @@ function update(count, numUpdated, region) {
     }
 }
 
-//update(900, 0, "us-east-1");
-//launch(900, 501, "us-east-1");
+launch(500, 0, "us-west-2");
