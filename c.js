@@ -207,7 +207,7 @@ class Earl {
                 }
     
                 if(numProcessed === this.lambda_names.length) {
-                    console.log("All IPs have been processed");
+                    console.log("All " + Object.keys(ips).length + " unique IPs have been processed");
                     this.ips = ips;
                     
                     setTimeout(() => {
@@ -227,11 +227,10 @@ function getLambdaNames() {
     let ln = [];
     for(let i = 0; i < 900; i++) {
         ln.push(["hydrate-" + i, "us-east-1"]);
+        ln.push(["hydrate-" + i, "us-west=2"]);
     }
     return ln;
 }
-
-
 
 function go() {
     fs.readFile("client_config.json", function(err, config) {
