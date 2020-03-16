@@ -227,7 +227,7 @@ function getLambdaNames() {
     let ln = [];
     for(let i = 0; i < 900; i++) {
         ln.push(["hydrate-" + i, "us-east-1"]);
-        ln.push(["hydrate-" + i, "us-west=2"]);
+        ln.push(["hydrate-" + i, "us-west-2"]);
     }
     return ln;
 }
