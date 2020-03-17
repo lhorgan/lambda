@@ -39,9 +39,15 @@ class Earl {
         let serverIndex = 0;
         let urlsToSend = [];
         let ctr = 0;
-        let numIPs = Object.keys(ipFreeze).length;
-
+        //let numIPs = Object.keys(ipFreeze).length;
+        
+        let ipList = [];
         for(let ip in ipFreeze) {
+            ipList.push([ip, name, region]);
+        }
+        shuffle(ipList);
+
+        for(let i = 0; i < ipList.length; i++) {
             let [url, year] = await this.getNextURL();
 
             if(url === null && year === null) {
@@ -52,12 +58,13 @@ class Earl {
                 return false;
             }
 
-            let name = ipFreeze[ip][0];
-            let region = ipFreeze[ip][1];
+            let name = ipList[i][1];
+            let region = ipList[i][2];
             ctr++;
 
             urlsToSend.push([name, region, url]);
-            if(urlsToSend.length >= this.lambdasPerServer || ctr === numIPs) {
+            if(urlsToSend.length >= this.lambdasPerServer || ctr === ipList.length) {
+                console.log("SENDING TO " + region + " at IP " + ipList[i][0]);
                 let urlsToSendFreeze = JSON.stringify(urlsToSend);
                 this.sendURLs(this.servers[serverIndex], urlsToSendFreeze);
                 urlsToSend = [];
@@ -219,6 +226,17 @@ class Earl {
                 }
             });
         }
+    }
+}
+
+// lazy
+// https://medium.com/@nitinpatel_20236/how-to-shuffle-correctly-shuffle-an-array-in-javascript-15ea3f84bfb
+function shuffle(array) {
+    for(let i = array.length - 1; i > 0; i--){
+        const j = Math.floor(Math.random() * i);
+        const temp = array[i]
+        array[i] = array[j];
+        array[j] = temp;
     }
 }
 
