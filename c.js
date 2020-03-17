@@ -43,7 +43,7 @@ class Earl {
         
         let ipList = [];
         for(let ip in ipFreeze) {
-            ipList.push([ip, name, region]);
+            ipList.push([ip, ipFreeze[ip][0], ipFreeze[ip][1]]); // [ip, name, region]
         }
         shuffle(ipList);
 
