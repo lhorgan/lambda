@@ -2,9 +2,6 @@ var express = require('express');
 var app = express();
 var bodyParser = require('body-parser')
 var AWS = require('aws-sdk');
-AWS.config.update({region: 'us-east-1'});
-
-var lambda = new AWS.Lambda();
 
 app.use(bodyParser.json());
 
@@ -36,6 +33,7 @@ class Earl {
             //console.log("Setting region to "  + region);
 
             AWS.config.update({region: region});
+            var lambda = new AWS.Lambda();
 
             var params = {
                 FunctionName: name,
