@@ -64,7 +64,6 @@ class Earl {
 
             urlsToSend.push([name, region, url]);
             if(urlsToSend.length >= this.lambdasPerServer || ctr === ipList.length) {
-                console.log("SENDING TO " + region + " at IP " + ipList[i][0]);
                 let urlsToSendFreeze = JSON.stringify(urlsToSend);
                 this.sendURLs(this.servers[serverIndex], urlsToSendFreeze);
                 urlsToSend = [];
