@@ -37,7 +37,7 @@ class Earl {
             
             let payload = {"url": url};
             if(typeof(options) === "object") {
-                for(option in options) {
+                for(let option in options) {
                     payload[option] = options[option];
                 }
             }
