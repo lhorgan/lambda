@@ -29,15 +29,22 @@ class Earl {
         let messages = [];
 
         for(let i = 0; i < urls.length; i++) {
-            let [name, region, url] = urls[i];
+            let [name, region, url, options] = urls[i];
             //console.log("Setting region to "  + region);
 
             AWS.config.update({region: region});
             var lambda = new AWS.Lambda();
+            
+            let payload = {"url": url};
+            if(typeof(options) === "object") {
+                for(option in options) {
+                    payload[option] = options[option];
+                }
+            }
 
             var params = {
                 FunctionName: name,
-                Payload: JSON.stringify({"url": url})
+                Payload: JSON.stringify(payload)
             };
 
             lambda.invoke(params, (err, data) => {

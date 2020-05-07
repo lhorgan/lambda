@@ -62,7 +62,7 @@ class Earl {
             let region = ipList[i][2];
             ctr++;
 
-            urlsToSend.push([name, region, url]);
+            urlsToSend.push([name, region, url, {"timeout": 60, "method": "GET"}]);
             if(urlsToSend.length >= this.lambdasPerServer || ctr === ipList.length) {
                 let urlsToSendFreeze = JSON.stringify(urlsToSend);
                 this.sendURLs(this.servers[serverIndex], urlsToSendFreeze);
@@ -86,8 +86,6 @@ class Earl {
     }
 
     sendURLs(server, urls) {
-        //console.log("Fetching from server " + server);
-        //console.log(urls);
         fetch(server + "/urls", {
             method: "post",
             body: urls,

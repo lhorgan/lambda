@@ -15,10 +15,19 @@ def lambda_handler(event, context):
 
         url = event["url"]
         headers = {"User-Agent": random.choice(user_agents), "Connection": "keep-alive", "Accept-Language": "en-US", "Accept": "*/*"}
+        timeout = 3.5
+        method = "HEAD"
+        
+        if "headers" in event:
+            headers = event["headers"]
+        if "timeout" in event:
+            timeout = event["timeout"]
+        if "method" in event:
+            method = event["method"]
 
         try:
             pool = PoolManager()
-            r = pool.request("HEAD", url, headers=headers, timeout=3.5)
+            r = pool.request("HEAD", url, headers=headers, timeout=timeout)
 
             if r.status < 400:
                 diff = int((time.time() * 1000 - start))

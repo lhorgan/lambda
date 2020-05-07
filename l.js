@@ -45,27 +45,53 @@ function launch(count, numLaunched, region, update) {
 }
 
 /* Update the lambdas */
-function update(count, numUpdated, region) {
+function updateConfig(count, numUpdated, region) {
     if(numUpdated < count) {
         AWS.config.update({region: region});
+        let lambda = new AWS.Lambda();
+
+        var params = {
+            FunctionName: "hydrate-" + numUpdated, 
+            Timeout: 60 
+        };
+        
+        lambda.updateFunctionConfiguration(params, (err, data) => {
+            if(err) {
+                console.log(err);
+                setTimeout(() => { updateConfig(count, numUpdated, region); }, 1000);
+            }
+            else {
+                console.log("Updated " + numUpdated);
+                setTimeout(() => { updateConfig(count, numUpdated + 1, region) }, 1000);
+            }
+        });
+    }
+}
+
+/* Update the lambdas */
+function updateCode(count, numUpdated, region) {
+    if(numUpdated < count) {
+        AWS.config.update({region: region});
+        let lambda = new AWS.Lambda();
 
         var params = {
             ZipFile: fs.readFileSync("lambda.zip"),
-            Publish: true,
             FunctionName: "hydrate-" + numUpdated, 
         };
         
         lambda.updateFunctionCode(params, (err, data) => {
             if(err) {
                 console.log(err);
-                setTimeout(() => { update(count, numUpdated, region); }, 1000);
+                setTimeout(() => { updateCode(count, numUpdated, region); }, 1000);
             }
             else {
-                console.log("Updated " + numUpdated);
-                setTimeout(() => { update(count, numUpdated + 1, region) }, 1000);
+                console.log("Updated code for " + numUpdated);
+                setTimeout(() => { updateCode(count, numUpdated + 1, region) }, 1000);
             }
         });
     }
 }
 
-launch(500, 0, "us-west-2");
+//launch(900, 0, "us-east-1");
+updateConfig(900, 0, "us-east-1");
+updateCode(900, 0, "us-east-1");
