@@ -1,4 +1,5 @@
 from urllib3 import PoolManager
+from urllib3.util.retry import Retry
 import random
 import sys
 import time
@@ -17,6 +18,7 @@ def lambda_handler(event, context):
         headers = {"User-Agent": random.choice(user_agents), "Connection": "keep-alive", "Accept-Language": "en-US", "Accept": "*/*"}
         timeout = 3.5
         method = "HEAD"
+        retry = Retry(total=2)
         
         if "headers" in event:
             headers = event["headers"]
@@ -24,11 +26,13 @@ def lambda_handler(event, context):
             timeout = event["timeout"]
         if "method" in event:
             method = event["method"]
+        if "retries" in event:
+            retry = Retry(event["retry"])
 
         try:
             pool = PoolManager()
-            r = pool.request("HEAD", url, headers=headers, timeout=timeout)
-
+            r = pool.request("HEAD", url, headers=headers, timeout=timeout, retries=retry)
+    
             if r.status < 400:
                 diff = int((time.time() * 1000 - start))
                 return {"error": "false", "url": r.geturl(), "orig_url": url, "diff": diff}
