@@ -5,14 +5,16 @@ var fs = require('fs');
 const lineByLine = require('n-readlines');
 var level = require('level');
 const fetch = require('node-fetch');
+var Url = require('url-parse');
 
 class Earl {
-    constructor(lambda_names, ifname, ofname, dbname, servers, lambdasPerServer) {
+    constructor(lambda_names, ifname, ofname, dbname, servers, specialMethods, lambdasPerServer) {
         this.lambda_names = lambda_names;
         this.ips = {};
         this.readstream = new lineByLine(ifname);
         this.db = level(dbname);
         this.allLinesRead = false;
+        //this.totalLines = 0;
         this.urlsToWrite = [];
         this.ofname = ofname;
         this.numProcessed = 0;
@@ -20,14 +22,72 @@ class Earl {
         this.lambdasPerServer = lambdasPerServer;
         this.queue = [];
         this.urlCount = 0;
+        this.urlWriteCount = 0;
         this.done = false;
 
+        this.specialMethods = specialMethods;
+        this.timeouts = {};
+        this.successCounts = {};
+        this.specialTimeouts = {};
+        this.retries = {};
+        this.hopeless = {};
+
         this.collectIPs();
+        let queueEmpty = this.queue.length === 0;
+
+        let timeoutInterval = setInterval(() => {
+            let numInPurgatory = 0;
+            console.log("Assessing our timeout interval");
+            for(let domain in this.timeouts) {
+                let successCounts = 0;
+                if(domain in this.successCounts) {
+                    successCounts = this.successCounts[domain];
+                }
+                let total = successCounts + this.timeouts[domain].length;
+                console.log(`Total successes for ${domain} is ${successCounts}, against total attempts: ${total}`);
+                numInPurgatory += this.timeouts[domain].length;
+
+                if(total >= 6 || (queueEmpty && this.allLinesRead)) {
+                    console.log("Enough requests have been made for us to pass judgement");
+                    if(successCounts / total < 0.67) {
+                        console.log(`Enough requests to ${domain} failed for us to bump up its timeout`);
+                        let currentTimeout = 3.5;
+                        if(domain in this.specialTimeouts) {
+                            currentTimeout = this.specialTimeouts[domain];
+                        }
+                        let newTimeout = currentTimeout * 2;
+                        console.log(`New timeout for ${domain} is ${newTimeout}`);
+                        if(newTimeout < 30) {
+                            this.specialTimeouts[domain] = newTimeout;
+                            this.queue = this.queue.concat(this.timeouts[domain]);
+                            delete this.timeouts[domain];
+                        }
+                        else {
+                            console.log(`The timeout is too high, ${domain} is hopeless.`);
+                            // this url is hopeless
+                            this.hopeless[domain] = true;
+                            delete this.specialTimeouts[domain];
+                            this.queue = this.queue.concat(this.timeouts[domain]);
+                            delete this.timeouts[domain];
+                        }
+                    }
+                    else {
+                        console.log(`${domain} is doing pretty okay at its current timeout`);
+                        // we have enough succeses as things are
+                        delete this.successCounts[domain];
+                        this.queue = this.queue.concat(this.timeouts[domain]);
+                        delete this.timeouts[domain];
+                    }
+                }
+            }
+            console.log("We now have " + numInPurgatory + " urls in purgatory");
+        }, 20000);
 
         let interval = setInterval(async () => {
             this.done = !await this.expand();
             if(this.done) {
                 clearInterval(interval);
+                clearInterval(timeoutInterval);
                 console.log("That's all, folks.");
             }
         }, 1000);
@@ -57,12 +117,27 @@ class Earl {
 
                 return false;
             }
+            /*else if(url === null) {
+                return true;
+            }*/
 
-            let name = ipList[i][1];
-            let region = ipList[i][2];
+            if(url !== null) {
+                let name = ipList[i][1];
+                let region = ipList[i][2];
+                
+                let special = {};
+                let urlObj = new Url(url);
+                let domain = urlObj.host;
+                if(domain in this.specialTimeouts) {
+                    special["timeout"] = this.specialTimeouts[domain];
+                }
+                if(domain in this.specialMethods) {
+                    special["method"] = this.specialMethods[domain];
+                }
+                urlsToSend.push([name, region, url, special]);
+            }
             ctr++;
 
-            urlsToSend.push([name, region, url, {"timeout": 60, "method": "GET"}]);
             if(urlsToSend.length >= this.lambdasPerServer || ctr === ipList.length) {
                 let urlsToSendFreeze = JSON.stringify(urlsToSend);
                 this.sendURLs(this.servers[serverIndex], urlsToSendFreeze);
@@ -86,6 +161,14 @@ class Earl {
     }
 
     sendURLs(server, urls) {
+        //console.log("SENDING URLS WITH LENGTH " + urls.length);
+        //console.log(JSON.stringify(urls));
+        //console.log(urls[0]);
+        if(urls.length === 2) { // "[]"
+            console.log("LENGTH IS 0, skipping");
+            return;
+        }
+
         fetch(server + "/urls", {
             method: "post",
             body: urls,
@@ -94,7 +177,8 @@ class Earl {
         .then(this.handleErrors)
         .then(response => response.json())
         .then(data => {
-            this.writeURLs(data);
+            let processedURLs = this.processURLs(data);
+            this.writeURLs(processedURLs);
             this.numProcessed += data.length;
             console.log(this.numProcessed);
         })
@@ -108,30 +192,174 @@ class Earl {
         });
     }
 
+    processURLs(urls) {
+        let urlsEnqueuedStart = this.queue.length;
+        let urlsToWriteStart = urls.length;
+        let urlsTimedOutStart = 0;
+        for(let domain in this.timeouts) {
+            urlsTimedOutStart += this.timeouts[domain].length;
+        }
+
+        let urlsToWrite = [];
+        for(let i = 0; i < urls.length; i++) {
+            let url = urls[i].orig_url;
+            console.log(url + " --> " + urls[i].url);
+            let urlObj = new Url(url);
+            let domain = urlObj.host;
+            if(urls[i].err === "true") {
+                console.log("Error on " + url);
+                if(urls[i].msg === "<class 'urllib3.exceptions.MaxRetryError'>") {
+                    console.log("Error type: timeout");
+                    if(domain in this.hopeless) {
+                        console.log(`${domain} is hopeless`);
+                        if(url in this.retries) {
+                            urls[i].retries = this.retries[url];
+                        }
+                        else {
+                            urls[i].retries = 0;
+                        }
+                        urls[i].timeout = "MAX";
+                        urlsToWrite.push(urls[i]);
+                    }
+                    else {
+                        console.log(`${url} time out but not hopeless, adding to timeout list for ${domain}`)
+                        if(!(domain in this.timeouts)) {
+                            this.timeouts[domain] = [];
+                        }
+                        this.timeouts[domain].push(url);
+                    }
+                }
+                else {
+                    console.log("Another type of error occurred on " + url);
+                    if(!(url in this.retries)) {
+                        this.retries[url] = 0;
+                    }
+                    
+                    if(this.retries[url] < 4) {
+                        this.retries[url]++;
+                        console.log(`Giving ${url} another try, attempts now at ${this.retries[url]}`);
+                        this.queue.push(url);
+                    }
+                    else {
+                        console.log("Max retries exceeded for " + url);
+                        delete this.retries[url];
+                        if(urls[i].url === "null" || urls[i].url === null) {
+                            urls[i].url = url;
+                        }
+                        urls[i].retries = "MAX";
+                        urls[i].timeout = 3.5;
+                        if(url in this.specialTimeouts) {
+                            urls[i].timeout = this.specialTimeouts;
+                        }
+                        urlsToWrite.push(urls[i]);
+                    }
+                }
+            }
+            else {
+                if(urls[i].url === null || urls[i].url === "null" || urls[i].url === undefined) {
+                    console.log("No URL returned for " + url);
+                    urls[i].url = url;
+                    if(!(url in this.retries)) {
+                        this.retries[url] = 0;
+                    }
+                    
+                    if(this.retries[url] < 4) {
+                        this.retries[url]++;
+                        console.log(`Giving ${url} another try, attempts now at ${this.retries[url]}`);
+                        this.queue.push(url);
+                    }
+                    else {
+                        console.log("Max retries exceeded for " + url);
+                        delete this.retries[url];
+                        urls[i].retries = "MAX";
+                        urls[i].timeout = 3.5;
+                        if(url in this.specialTimeouts) {
+                            urls[i].timeout = this.specialTimeouts;
+                        }
+                        urlsToWrite.push(urls[i]);
+                    }
+                }
+                else {
+                    console.log("Successfully expanded " + url + " to ");
+                    if(domain in this.timeouts) {
+                        if(!(domain in this.successCounts)) {
+                            this.successCounts[domain] = 0;
+                        }
+                        this.successCounts[domain]++;
+                    }
+
+                    if(url in this.retries) {
+                        urls[i].retries = this.retries[url];
+                    }
+                    else {
+                        urls[i].retries = 0;
+                    }
+                    urls[i].timeout = 3.5;
+                    if(url in this.specialTimeouts) {
+                        urls[i].timeout = this.specialTimeouts;
+                    }
+                    delete this.retries[url];
+                    urlsToWrite.push(urls[i]);
+                }
+            }
+        }
+
+        let urlsEnqueuedEnd = this.queue.length;
+        let urlsToWriteEnd = urlsToWrite.length;
+        let urlsTimedOutEnd = 0;
+        for(let domain in this.timeouts) {
+            urlsTimedOutEnd += this.timeouts[domain].length;
+        }
+
+        console.log(`ENQUEUED: (${urlsEnqueuedStart}, ${urlsEnqueuedEnd}), TOWRITE: (${urlsToWriteStart}, ${urlsToWriteEnd}), TIMED OUT: (${urlsTimedOutStart}, ${urlsTimedOutEnd}), TOTAL: (${urlsEnqueuedStart + urlsToWriteStart + urlsTimedOutStart}, ${urlsEnqueuedEnd + urlsToWriteEnd + urlsTimedOutEnd})`);
+
+        return urlsToWrite;
+    }
+
     writeURLs(urls) {
         //console.log("Writing a batch of URLs");
         this.urlsToWrite = [];
         let urlStr = "";
         for(let i = 0; i < urls.length; i++) {
-            urlStr += urls[i].url + "\t" + 
+            let newURL = urls[i].url;
+            if(!newURL) {
+                newURL = urls[i].orig_url;
+            }
+
+            urlStr += newURL + "\t" + 
                       urls[i].orig_url + "\t" + 
                       urls[i].time + "\t" +
                       urls[i].err + "\t" +
-                      urls[i].msg;
+                      urls[i].msg + "\t" +
+                      urls[i].timeout + "\t" +
+                      urls[i].retries
             urlStr += "\r\n";
 
             this.db.put(urls[i].orig_url, "", () => {});
         }
-
+        
+        this.urlWriteCount += urls.length;
         var stream = fs.createWriteStream(this.ofname, {flags:'a'});
         stream.write(urlStr);
         stream.end();
     }
 
     async getNextURL() {
-        let queueURL = this.queue.pop();
-        if(queueURL) {
-            return [queueURL, 2020];
+        if(this.allLinesRead || Math.random() < 0.1) { // read an errored URL off the list with 10% probability
+            let queueURL = this.queue.pop();
+            if(queueURL) {
+                return [queueURL, 2020];
+            }
+            else if(this.allLinesRead) {
+                if(Object.keys(this.timeouts).length === 0 && this.urlCount === this.urlWriteCount) {
+                    console.log("Not waiting on any timeouts");
+                    return [null, null];
+                }
+                else {
+                    //console.log("All lines read, queue empty, but still waiting on some timeouts!");
+                    return [null, 2020];
+                }
+            }
         }
 
         while(true) { // this'll just keep going 'til we find something that isn't in the database
@@ -166,7 +394,7 @@ class Earl {
                     console.log("End of file reached!");
                 }
                 this.allLinesRead = true;
-                return [null, null];
+                return [null, 2020];
             }
         }
     }
@@ -226,6 +454,11 @@ class Earl {
     }
 }
 
+function handleTimeout(url) {
+    let urlObj = URL(url);
+
+}
+
 // lazy
 // https://medium.com/@nitinpatel_20236/how-to-shuffle-correctly-shuffle-an-array-in-javascript-15ea3f84bfb
 function shuffle(array) {
@@ -240,7 +473,7 @@ function shuffle(array) {
 
 function getLambdaNames() {
     let ln = [];
-    for(let i = 0; i < 900; i++) {
+    for(let i = 0; i < 250; i++) {
         ln.push(["hydrate-" + i, "us-east-1"]);
         //ln.push(["hydrate-" + i, "us-west-2"]);
     }
@@ -260,6 +493,7 @@ function go() {
                                 config.dst, 
                                 config.db, 
                                 config.servers, 
+                                config.specialMethods,
                                 50);
         }
     });
