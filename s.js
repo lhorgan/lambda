@@ -54,8 +54,8 @@ class Earl {
                     message["orig_url"] = url;
                     message["err"] = true;
                     message["msg"] = err.toString();
-                    message["url"] = "";
                     message["time"] = "";
+                    message["blurb"] = {};
                 }
                 else {
                     //console.log("we successed");
@@ -68,7 +68,7 @@ class Earl {
                         message["err"] = true;
                         message["msg"] = res.errorMessage;
                         message["time"] = "";
-                        message["url"] = "";
+                        message["blurb"] = {};
                     }
                     else {
                         message["err"] = res.error;
@@ -76,6 +76,7 @@ class Earl {
                         message["url"] = res.url;
                         message["time"] = res.diff;
                         message["msg"] = res.message;
+                        message["blurb"] = res.json;
                     }
                 }
                 messages.push(message);

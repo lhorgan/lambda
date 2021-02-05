@@ -280,7 +280,7 @@ class Earl {
                     }
                 }
                 else {
-                    console.log("Successfully expanded " + url + " to ");
+                    //console.log("Successfully expanded " + url + " to ");
                     if(domain in this.timeouts) {
                         if(!(domain in this.successCounts)) {
                             this.successCounts[domain] = 0;
