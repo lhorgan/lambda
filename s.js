@@ -17,7 +17,7 @@ class Earl {
 
         app.post("/urls", (req, res) => {
             console.log("urls received");
-            console.log(req.body);
+            //console.log(req.body);
             let urls = req.body;
             this.expand(urls, (messages) => {
                 res.send(JSON.stringify(messages));
@@ -81,8 +81,8 @@ class Earl {
                         message["blurb"] = res.json;
                     }
                 }
-                console.log(message);
-                console.log("\n");
+                //console.log(message);
+                //console.log("\n");
                 messages.push(message);
                 
                 if(messages.length === Object.keys(urls).length) {
