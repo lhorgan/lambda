@@ -12,7 +12,7 @@ class Earl {
 
     configure() {
         app.listen(8081, function () {
-            console.log("App listening on port 8081");
+            console.log("App listening on port 8081!");
         });
 
         app.post("/urls", (req, res) => {
@@ -52,6 +52,7 @@ class Earl {
                 if(err) {
                     //console.log("There was an error");
                     message["orig_url"] = url;
+                    message["url"] = url; // for legacy reasons
                     message["err"] = true;
                     message["msg"] = err.toString();
                     message["time"] = "";
@@ -59,12 +60,13 @@ class Earl {
                 }
                 else {
                     //console.log("we successed");
-                    console.log(data);
+                    //console.log(data);
                     
                     let res = JSON.parse(data["Payload"]);
 
                     if(res.errorMessage) {
                         message["orig_url"] = url;
+                        message["url"] = url;
                         message["err"] = true;
                         message["msg"] = res.errorMessage;
                         message["time"] = "";
@@ -73,12 +75,14 @@ class Earl {
                     else {
                         message["err"] = res.error;
                         message["orig_url"] = res.orig_url;
-                        message["url"] = res.url;
+                        message["url"] = url;
                         message["time"] = res.diff;
                         message["msg"] = res.message;
                         message["blurb"] = res.json;
                     }
                 }
+                console.log(message);
+                console.log("\n");
                 messages.push(message);
                 
                 if(messages.length === Object.keys(urls).length) {
