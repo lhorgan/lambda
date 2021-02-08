@@ -280,7 +280,7 @@ class Earl {
                     }
                 }
                 else {
-                    //console.log("Successfully expanded " + url + " to ");
+                    console.log("Successfully expanded " + url + " to ");
                     if(domain in this.timeouts) {
                         if(!(domain in this.successCounts)) {
                             this.successCounts[domain] = 0;
@@ -317,7 +317,9 @@ class Earl {
     }
 
     writeURLs(urls) {
-        //console.log("Writing a batch of URLs");
+        console.log("Writing a batch of URLs");
+        //console.log(urls);
+
         this.urlsToWrite = [];
         let urlStr = "";
         for(let i = 0; i < urls.length; i++) {
@@ -332,7 +334,8 @@ class Earl {
                       urls[i].err + "\t" +
                       urls[i].msg + "\t" +
                       urls[i].timeout + "\t" +
-                      urls[i].retries
+                      urls[i].retries + "\t" +
+                      JSON.stringify(urls[i].blurb)
             urlStr += "\r\n";
 
             this.db.put(urls[i].orig_url, "", () => {});
@@ -474,7 +477,7 @@ function shuffle(array) {
 function getLambdaNames() {
     let ln = [];
     for(let i = 0; i < 250; i++) {
-        ln.push(["hydrate-" + i, "us-east-1"]);
+        ln.push(["blurby" + i, "us-east-1"]);
         //ln.push(["hydrate-" + i, "us-west-2"]);
     }
     return ln;
